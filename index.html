@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Yardly - Full System v8.0</title>
+    <title>Yardly - Full Control v8.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -13,9 +13,9 @@
         :root { --yardly-green: #2D5A27; --growth-lime: #A2D149; }
         body { background-color: #F8FAFC; font-family: 'Outfit', sans-serif; color: #1E293B; padding-top: 80px; }
         .card-luxe { background: white; border-radius: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #F1F5F9; }
-        .nav-active { color: var(--yardly-green); border-bottom: 2px solid var(--yardly-green); }
-        .alert-ring { position: relative; }
-        .alert-ring::after { content: ''; position: absolute; top: 0; right: 0; width: 8px; height: 8px; background: #EF4444; border-radius: 50%; border: 2px solid white; }
+        .input-field { width: 100%; padding: 12px; border: 1px solid #E2E8F0; border-radius: 0.75rem; font-weight: 600; margin-top: 4px; outline: none; }
+        .input-field:focus { border-color: var(--yardly-green); }
+        .modal-overlay { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); position: fixed; inset: 0; z-index: 200; display: flex; align-items: flex-end; }
     </style>
 </head>
 <body>
@@ -27,121 +27,96 @@
         const YardlyApp = () => {
             const [view, setView] = useState('dashboard');
             const [isMenuOpen, setIsMenuOpen] = useState(false);
+            const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+            const [isEditingYard, setIsEditingYard] = useState(false);
 
-            // --- SHARED DATA STATE ---
-            const [profile, setProfile] = useState(() => JSON.parse(localStorage.getItem('yardly_pro_v8') || '{"grassType": "TTTF/KBG Mix", "zip": "43235", "zone": "6b", "soil": "Silty Clay", "ph": "6.5"}'));
-            const [shed, setShed] = useState(() => JSON.parse(localStorage.getItem('yardly_shed_v8') || '[{"id":1, "brand":"Toro", "name":"TimeMaster 30\\"", "type":"Mower", "lastSharp":"2025-11-15"}]'));
+            // --- PERSISTENT STATE ---
+            const [profile, setProfile] = useState(() => JSON.parse(localStorage.getItem('yardly_pro_v81') || '{"grassType": "TTTF/KBG Mix", "zip": "43235", "zone": "6b", "soil": "Silty Clay", "ph": "6.5"}'));
+            const [shed, setShed] = useState(() => JSON.parse(localStorage.getItem('yardly_shed_v81') || '[]'));
 
             useEffect(() => {
-                localStorage.setItem('yardly_pro_v8', JSON.stringify(profile));
-                localStorage.setItem('yardly_shed_v8', JSON.stringify(shed));
+                localStorage.setItem('yardly_pro_v81', JSON.stringify(profile));
+                localStorage.setItem('yardly_shed_v81', JSON.stringify(shed));
             }, [profile, shed]);
 
-            // --- WEATHER & METRICS ---
-            const metrics = {
-                temp: 39,
-                soilTemp: 32,
-                wind: "12 mph NW",
-                humidity: "64%",
-                gdd: 0, // Growing Degree Days
-                status: "Dormant"
+            // --- EQUIPMENT DATABASE ---
+            const MASTER_TOOLS = [
+                { brand: "Toro", name: "TimeMaster 30\"", type: "Mower" },
+                { brand: "Echo", name: "RB-60", type: "Spreader" },
+                { brand: "Honda", name: "HRX217VKA", type: "Mower" },
+                { brand: "Scotts", name: "Elite Spreader", type: "Spreader" }
+            ];
+
+            const addTool = (tool) => {
+                setShed([...shed, { ...tool, id: Date.now(), lastSharp: 'N/A' }]);
+                setIsAddModalOpen(false);
             };
 
-            // --- COMPONENTS ---
+            // --- VIEWS ---
             const Dashboard = () => (
-                <div className="px-6 max-w-md mx-auto animate-in fade-in duration-500">
-                    <div className="mb-6">
-                        <h2 className="text-3xl font-800 tracking-tight text-slate-900">Hello, <span className="text-[#2D5A27]">Coach</span></h2>
-                        <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-1">Zip: {profile.zip} • {metrics.status}</p>
+                <div className="px-6 max-w-md mx-auto animate-in fade-in">
+                    <div className="mb-6 mt-4">
+                        <h2 className="text-3xl font-800 tracking-tight">System <span className="text-[#2D5A27]">Ready</span></h2>
+                        <p className="text-slate-400 font-bold text-[10px] uppercase mt-1 tracking-widest">Columbus, OH • 39°F</p>
                     </div>
-
-                    {/* Weather Grid */}
+                    
                     <div className="grid grid-cols-2 gap-3 mb-6">
-                        <div className="card-luxe p-4">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Air Temp</p>
-                            <p className="text-2xl font-800 text-slate-800">{metrics.temp}°F</p>
+                        <div onClick={() => setView('shed')} className="card-luxe p-5 cursor-pointer">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Fleet</p>
+                            <p className="font-800 text-slate-800">Shed ({shed.length})</p>
                         </div>
-                        <div className="card-luxe p-4 border-l-4 border-[#A2D149]">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase">Soil Temp</p>
-                            <p className="text-2xl font-800 text-slate-800">{metrics.soilTemp}°F</p>
-                        </div>
-                    </div>
-
-                    {/* Scientific Insight Card */}
-                    <div className="card-luxe p-6 mb-6 bg-[#2D5A27] text-white">
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A2D149]">Agronomy Alert</span>
-                            <span className="text-xs">❄️</span>
-                        </div>
-                        <p className="text-sm font-semibold leading-relaxed mb-4">
-                            Soil is currently {metrics.soilTemp}°F. Micro-organisms are inactive. Avoid heavy foot traffic to prevent crown damage on your {profile.grassType}.
-                        </p>
-                        <div className="flex justify-between text-[10px] font-bold opacity-60">
-                            <span>GDD: {metrics.gdd}</span>
-                            <span>WIND: {metrics.wind}</span>
+                        <div onClick={() => setView('profile')} className="card-luxe p-5 cursor-pointer">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Profile</p>
+                            <p className="font-800 text-slate-800">My Yard</p>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3">
-                        <button onClick={() => setView('shed')} className="card-luxe p-5 flex justify-between items-center hover:bg-slate-50">
-                            <span className="font-800 text-slate-700">The Shed</span>
-                            <span className="alert-ring">🚜</span>
-                        </button>
-                        <button onClick={() => setView('profile')} className="card-luxe p-5 flex justify-between items-center hover:bg-slate-50">
-                            <span className="font-800 text-slate-700">My Yard</span>
-                            <span>🌱</span>
-                        </button>
+                    <div className="card-luxe p-6 bg-[#2D5A27] text-white">
+                        <p className="text-[10px] font-bold uppercase text-[#A2D149] mb-2">Next Step</p>
+                        <p className="font-semibold text-sm">Prepare for Spring: Check the shed for maintenance alerts.</p>
                     </div>
                 </div>
             );
 
             const ShedView = () => (
                 <div className="px-6 max-w-md mx-auto pb-24 animate-in slide-in-from-right">
-                    <h2 className="text-3xl font-800 text-slate-900 mb-6">The Shed</h2>
-                    {shed.length > 0 ? shed.map(item => (
-                        <div key={item.id} className="card-luxe p-6 mb-4">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <p className="text-[10px] font-bold text-blue-500 uppercase">{item.brand}</p>
-                                    <h4 className="text-lg font-800 text-slate-800">{item.name}</h4>
-                                </div>
-                                <span className="text-xs bg-red-50 text-red-500 px-2 py-1 rounded font-bold uppercase">Dull</span>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-3xl font-800 text-slate-900">The Shed</h2>
+                        <button onClick={() => setIsAddModalOpen(true)} className="bg-[#2D5A27] text-white px-4 py-2 rounded-xl text-[10px] font-800 uppercase">+ Add</button>
+                    </div>
+                    {shed.map(item => (
+                        <div key={item.id} className="card-luxe p-5 mb-3 flex justify-between items-center">
+                            <div>
+                                <p className="text-[9px] font-bold text-blue-500 uppercase">{item.brand}</p>
+                                <p className="font-800 text-slate-800">{item.name}</p>
                             </div>
-                            <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Last Sharpened</span>
-                                <span className="text-xs font-800">{item.lastSharp}</span>
-                            </div>
+                            <button onClick={() => setShed(shed.filter(t => t.id !== item.id))} className="text-xs text-red-300">✕</button>
                         </div>
-                    )) : (
-                        <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                            <p className="text-slate-400 font-800 uppercase text-xs">Shed is Empty</p>
-                        </div>
-                    )}
-                    <button className="w-full py-4 mt-4 bg-slate-900 text-white rounded-2xl font-800 uppercase text-[10px] tracking-widest">+ Register New Equipment</button>
+                    ))}
+                    {shed.length === 0 && <p className="text-center py-10 text-slate-400 font-bold uppercase text-xs">No equipment registered.</p>}
                 </div>
             );
 
-            const MyYardView = () => (
+            const ProfileView = () => (
                 <div className="px-6 max-w-md mx-auto pb-24 animate-in slide-in-from-right">
-                    <h2 className="text-3xl font-800 text-slate-900 mb-6">My Yard</h2>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-3xl font-800 text-slate-900">My Yard</h2>
+                        <button onClick={() => setIsEditingYard(!isEditingYard)} className="text-[#2D5A27] font-800 text-xs uppercase underline">
+                            {isEditingYard ? 'Close' : 'Edit'}
+                        </button>
+                    </div>
+                    
                     <div className="space-y-4">
                         <div className="card-luxe p-6">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-4">Core Info</p>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-800 text-slate-400 block mb-1">CULTIVAR</label>
-                                    <p className="font-700 text-slate-800 border-b pb-2">{profile.grassType}</p>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-800 text-slate-400 block mb-1">SOIL TEXTURE</label>
-                                    <p className="font-700 text-slate-800 border-b pb-2">{profile.soil}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="card-luxe p-6">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-4">Lab Results (pH)</p>
-                            <p className="text-4xl font-800 text-[#2D5A27]">{profile.ph}</p>
-                            <p className="text-[10px] font-bold text-slate-400 mt-2">OPTIMAL RANGE: 6.2 - 7.0</p>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase">Grass Cultivar</label>
+                            {isEditingYard ? (
+                                <input className="input-field" value={profile.grassType} onChange={(e) => setProfile({...profile, grassType: e.target.value})} />
+                            ) : <p className="font-800 text-lg text-slate-800">{profile.grassType}</p>}
+                            
+                            <label className="text-[10px] font-bold text-slate-400 uppercase mt-4 block">Soil pH</label>
+                            {isEditingYard ? (
+                                <input className="input-field" type="number" value={profile.ph} onChange={(e) => setProfile({...profile, ph: e.target.value})} />
+                            ) : <p className="font-800 text-lg text-slate-800">{profile.ph}</p>}
                         </div>
                     </div>
                 </div>
@@ -151,25 +126,23 @@
                 <div className="min-h-screen">
                     <nav className="fixed top-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-lg px-6 flex justify-between items-center z-50 border-b border-slate-100">
                         <div onClick={() => setView('dashboard')} className="flex items-center gap-1 cursor-pointer">
-                            <div className="w-7 h-7 bg-[#2D5A27] rounded-xl flex items-center justify-center shadow-lg shadow-green-900/20">
+                            <div className="w-7 h-7 bg-[#2D5A27] rounded-xl flex items-center justify-center">
                                 <div className="w-2 h-4 bg-[#A2D149] rounded-sm transform rotate-12"></div>
                             </div>
-                            <span className="font-800 text-2xl tracking-tighter text-slate-900">yardly</span>
+                            <span className="font-800 text-2xl text-slate-900">yardly</span>
                         </div>
-                        <button onClick={() => setIsMenuOpen(true)} className="w-10 h-10 flex flex-col items-center justify-center gap-1.5">
-                            <div className="w-5 h-0.5 bg-slate-900"></div>
-                            <div className="w-5 h-0.5 bg-slate-900"></div>
+                        <button onClick={() => setIsMenuOpen(true)} className="p-2">
+                             <div className="w-5 h-0.5 bg-slate-900 mb-1"></div>
+                             <div className="w-5 h-0.5 bg-slate-900"></div>
                         </button>
                     </nav>
 
                     {isMenuOpen && (
-                        <div className="fixed inset-0 z-[100] bg-white p-10 flex flex-col animate-in fade-in duration-300">
-                            <button onClick={() => setIsMenuOpen(false)} className="self-end text-3xl text-slate-300 font-light">✕</button>
+                        <div className="fixed inset-0 z-[100] bg-white p-10 flex flex-col animate-in fade-in">
+                            <button onClick={() => setIsMenuOpen(false)} className="self-end text-3xl">✕</button>
                             <div className="mt-12 space-y-8">
-                                {['dashboard', 'shed', 'profile', 'research'].map(m => (
-                                    <button key={m} onClick={() => { setView(m); setIsMenuOpen(false); }} className="block text-4xl font-800 text-slate-900 capitalize hover:text-[#2D5A27]">
-                                        {m === 'profile' ? 'My Yard' : m}
-                                    </button>
+                                {['dashboard', 'shed', 'profile'].map(m => (
+                                    <button key={m} onClick={() => { setView(m); setIsMenuOpen(false); }} className="block text-4xl font-800 text-slate-900 capitalize">{m === 'profile' ? 'My Yard' : m}</button>
                                 ))}
                             </div>
                         </div>
@@ -177,8 +150,26 @@
 
                     {view === 'dashboard' && <Dashboard />}
                     {view === 'shed' && <ShedView />}
-                    {view === 'profile' && <MyYardView />}
-                    {view === 'research' && <div className="p-10 font-800 uppercase text-slate-300">Library Online</div>}
+                    {view === 'profile' && <ProfileView />}
+
+                    {isAddModalOpen && (
+                        <div className="modal-overlay" onClick={() => setIsAddModalOpen(false)}>
+                            <div className="bg-white w-full rounded-t-3xl p-8 animate-in slide-in-from-bottom" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-xl font-800 mb-6">Equipment Library</h3>
+                                <div className="space-y-3">
+                                    {MASTER_TOOLS.map((t, i) => (
+                                        <button key={i} onClick={() => addTool(t)} className="w-full text-left p-4 bg-slate-50 rounded-xl flex justify-between items-center">
+                                            <div>
+                                                <p className="text-[10px] font-bold text-blue-500 uppercase">{t.brand}</p>
+                                                <p className="font-800 text-slate-800">{t.name}</p>
+                                            </div>
+                                            <span className="text-[10px] font-800 text-slate-300">ADD</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
