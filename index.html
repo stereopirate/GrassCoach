@@ -3,47 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Grass Coach - Professional Command</title>
+    <title>Grass Coach - Master Build</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root { --forest: #1B3022; --gold: #D4AF37; --turf: #F5F5F5; }
-        body { background: var(--turf); font-family: sans-serif; padding-top: 80px; }
-        .btn-coach { background: var(--forest); color: var(--gold); font-weight: 800; text-transform: uppercase; border-radius: 0.75rem; }
-        .menu-overlay { background: rgba(27, 48, 34, 0.98); backdrop-filter: blur(10px); z-index: 100; }
-        .logic-probe { cursor: pointer; color: var(--gold); background: rgba(212, 175, 55, 0.1); padding: 0 6px; border-radius: 4px; font-weight: 900; font-size: 10px; }
-        .card-shadow { box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+        body { background: var(--turf); font-family: sans-serif; padding-top: 80px; overflow-x: hidden; }
+        .btn-coach { background: var(--forest); color: var(--gold); font-weight: 800; text-transform: uppercase; border-radius: 0.75rem; transition: all 0.2s; }
+        .card-shadow { box-shadow: 0 10px 30px -5px rgba(0,0,0,0.08); }
+        .progress-bar { height: 6px; border-radius: 10px; background: rgba(255,255,255,0.1); overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--gold); transition: width 1s ease-in-out; }
+        .lab-input { background: transparent; border-bottom: 2px solid #e5e7eb; font-weight: 900; font-size: 1.1rem; width: 100%; outline: none; padding: 4px 0; }
+        .menu-item { font-size: 2.5rem; font-weight: 900; font-style: italic; text-transform: uppercase; color: white; margin-bottom: 1.5rem; text-align: left; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
         const GrassCoachApp = () => {
-            const [view, setView] = useState('command');
+            const [view, setView] = useState('dashboard');
             const [isMenuOpen, setIsMenuOpen] = useState(false);
             const [activeCitation, setActiveCitation] = useState(null);
 
-            // Persistent States
-            const [zipCode, setZipCode] = useState(() => localStorage.getItem('gc_zip') || '43235');
-            const [weather, setWeather] = useState({ temp: 39, soilTemp: 32, gdd: 0, city: 'Columbus, OH' });
-            const [soilData] = useState(() => JSON.parse(localStorage.getItem('gc_soil') || '{"ph":"6.5"}'));
+            // --- DATA STATE ---
+            const [zip, setZip] = useState(() => localStorage.getItem('gc_zip') || '43235');
+            const [soilData, setSoilData] = useState(() => JSON.parse(localStorage.getItem('gc_soil') || '{"ph":"6.5","p":"40","k":"150"}'));
+            const [shed, setShed] = useState(() => JSON.parse(localStorage.getItem('gc_shed') || '[]'));
+            
+            // --- CONSTANT WEATHER (Columbus, OH Feb 2026) ---
+            const weather = { temp: 39, soilTemp: 32, gdd: 0, status: "Winter Dormancy", city: "Columbus, OH" };
 
-            const CITATION_DB = {
-                "soil_dormancy": { org: "OSU Extension", logic: "Soil temperatures at 32°F indicate total microbial and root dormancy. Avoid N-applications.", link: "https://turf.osu.edu" }
-            };
+            // --- PERSISTENCE ---
+            useEffect(() => {
+                localStorage.setItem('gc_zip', zip);
+                localStorage.setItem('gc_soil', JSON.stringify(soilData));
+                localStorage.setItem('gc_shed', JSON.stringify(shed));
+            }, [zip, soilData, shed]);
 
-            const Nav = () => (
+            // --- COMPONENTS ---
+            const Header = () => (
                 <nav className="fixed top-0 left-0 right-0 bg-white border-b px-6 py-5 flex justify-between items-center z-50">
-                    <div onClick={() => setView('command')} className="cursor-pointer">
+                    <div onClick={() => setView('dashboard')} className="cursor-pointer">
                         <h1 className="text-xl font-black text-[#1B3022] italic tracking-tighter uppercase leading-none">Grass Coach</h1>
-                        <p className="text-[8px] font-black text-[#D4AF37] uppercase tracking-widest mt-1 italic">Verified Science</p>
+                        <p className="text-[8px] font-black text-[#D4AF37] uppercase tracking-widest mt-1">Science-Based Turf</p>
                     </div>
-                    <button onClick={() => setIsMenuOpen(true)} className="flex flex-col gap-1.5 items-end p-2">
+                    <button onClick={() => setIsMenuOpen(true)} className="p-2 flex flex-col gap-1.5 items-end">
                         <div className="w-6 h-0.5 bg-[#1B3022]"></div>
                         <div className="w-4 h-0.5 bg-[#1B3022]"></div>
                     </button>
@@ -52,69 +61,106 @@
 
             const Dashboard = () => (
                 <div className="p-4 max-w-md mx-auto animate-in fade-in duration-500">
-                    {/* Main Stats Card */}
-                    <div className="bg-[#1B3022] rounded-3xl p-6 text-white mb-8 shadow-2xl relative overflow-hidden">
-                        <div className="flex justify-between items-start mb-6">
+                    <div className="bg-[#1B3022] rounded-[2.5rem] p-8 text-white mb-8 shadow-2xl relative">
+                        <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-2">{weather.city}</p>
+                        <h3 className="text-5xl font-black italic mb-6">{weather.temp}°F</h3>
+                        
+                        <div className="space-y-4">
                             <div>
-                                <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-1">{weather.city} ({zipCode})</p>
-                                <h3 className="text-4xl font-black italic">{weather.temp}°F</h3>
+                                <div className="flex justify-between text-[10px] font-black uppercase mb-2">
+                                    <span>2026 Season Progress</span>
+                                    <span className="text-[#D4AF37]">8%</span>
+                                </div>
+                                <div className="progress-bar"><div className="progress-fill" style={{width: '8%'}}></div></div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-[10px] font-black opacity-30 uppercase">Soil Temp</p>
-                                <p className="text-xl font-black text-[#D4AF37]">{weather.soilTemp}°F</p>
+                            <div className="flex justify-between border-t border-white/10 pt-4 text-[10px] font-black uppercase">
+                                <span>Soil Temp: {weather.soilTemp}°F</span>
+                                <span>GDD: {weather.gdd}</span>
                             </div>
-                        </div>
-                        <div className="pt-4 border-t border-white/10 flex justify-between items-center text-[10px] font-black uppercase">
-                            <span>GDD Accumulation: {weather.gdd}</span>
-                            <span className="text-[#D4AF37]">Status: Winter Stasis</span>
                         </div>
                     </div>
 
-                    {/* Scientific Intel Section */}
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 px-1">Tactical Operations</p>
-                    <div className="bg-white p-5 rounded-2xl border-l-4 border-[#1B3022] card-shadow mb-6">
-                        <div className="flex justify-between items-center mb-2">
-                            <h4 className="font-black text-[#1B3022] text-xs uppercase italic">Dormancy Protocol</h4>
-                            <span className="logic-probe" onClick={() => setActiveCitation("soil_dormancy")}>ⓘ LOGIC</span>
-                        </div>
-                        <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                            No active growth detected. Focus on equipment maintenance and reviewing soil test data for Spring 2026.
-                        </p>
+                    <div className="bg-white p-6 rounded-3xl card-shadow border-l-4 border-[#1B3022] mb-6">
+                        <h4 className="font-black text-xs uppercase italic mb-2">Current Strategy</h4>
+                        <p className="text-xs text-gray-500 leading-relaxed font-medium">Ground is frozen. Root systems are inactive. Use this window to calibrate spreaders and finalize your soil remediation plan.</p>
+                        <button onClick={() => setView('resources')} className="mt-4 text-[10px] font-black text-[#D4AF37] uppercase underline">View Source: OSU Extension</button>
                     </div>
-                    
-                    <button onClick={() => setView('wizard')} className="w-full py-5 btn-coach shadow-lg text-[10px] tracking-widest">Start Pathogen Diagnosis Wizard</button>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <button onClick={() => setView('wizard')} className="bg-white p-6 rounded-3xl card-shadow text-left">
+                            <span className="block text-[10px] font-black text-gray-400 uppercase mb-2">Lab</span>
+                            <span className="block font-black text-[#1B3022] uppercase italic text-xs">Pathogen<br/>Wizard</span>
+                        </button>
+                        <button onClick={() => setView('soil_lab')} className="bg-white p-6 rounded-3xl card-shadow text-left">
+                            <span className="block text-[10px] font-black text-gray-400 uppercase mb-2">Entry</span>
+                            <span className="block font-black text-[#1B3022] uppercase italic text-xs">Soil Test<br/>Data</span>
+                        </button>
+                    </div>
                 </div>
             );
 
-            const CitationModal = () => (
-                <div className="fixed inset-0 z-[100] flex items-end">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setActiveCitation(null)}></div>
-                    <div className="relative w-full bg-white p-8 rounded-t-[2rem] animate-in slide-in-from-bottom duration-300">
-                        <h4 className="text-[10px] font-black text-[#D4AF37] uppercase mb-2">{CITATION_DB[activeCitation].org}</h4>
-                        <p className="text-sm font-bold text-[#1B3022] mb-6 leading-relaxed">{CITATION_DB[activeCitation].logic}</p>
-                        <button onClick={() => setActiveCitation(null)} className="w-full py-4 bg-gray-100 text-[10px] font-black uppercase rounded-xl">Dismiss</button>
+            const SoilLabView = () => (
+                <div className="p-4 max-w-md mx-auto">
+                    <h2 className="text-2xl font-black text-[#1B3022] italic uppercase mb-8">Soil Lab</h2>
+                    <div className="bg-white p-8 rounded-[2rem] space-y-8 card-shadow">
+                        <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase block mb-1">Soil pH</label>
+                            <input value={soilData.ph} onChange={e => setSoilData({...soilData, ph: e.target.value})} className="lab-input" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-8">
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase block mb-1">P (ppm)</label>
+                                <input value={soilData.p} onChange={e => setSoilData({...soilData, p: e.target.value})} className="lab-input" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase block mb-1">K (ppm)</label>
+                                <input value={soilData.k} onChange={e => setSoilData({...soilData, k: e.target.value})} className="lab-input" />
+                            </div>
+                        </div>
+                        <button onClick={() => setView('dashboard')} className="w-full py-4 btn-coach text-[10px] tracking-widest mt-4">Save To Engine</button>
+                    </div>
+                </div>
+            );
+
+            const ResourcesView = () => (
+                <div className="p-6 max-w-md mx-auto pb-24">
+                    <h2 className="text-3xl font-black text-[#1B3022] italic uppercase mb-8">Verified Sources</h2>
+                    <div className="space-y-6">
+                        {[
+                            {org: "The Ohio State University", site: "CFAES Extension", logic: "Phenology of cool-season grass types."},
+                            {org: "Cornell Turfgrass", site: "Art of Turf", logic: "Biological thresholds for weed germination."},
+                            {org: "FRAC", site: "Resistance Committee", logic: "Mode of Action (MOA) rotation guidelines."}
+                        ].map((s, i) => (
+                            <div key={i} className="border-b border-gray-200 pb-6">
+                                <p className="text-[10px] font-black text-[#D4AF37] uppercase mb-1">{s.org}</p>
+                                <h4 className="font-black text-[#1B3022] text-sm uppercase italic mb-2">{s.site}</h4>
+                                <p className="text-xs text-gray-400 font-medium">{s.logic}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
             );
 
             return (
-                <div className="min-h-screen pb-20">
-                    <Nav />
+                <div className="min-h-screen">
+                    <Header />
+                    
                     {isMenuOpen && (
-                        <div className="fixed inset-0 menu-overlay flex flex-col p-10 z-[60]">
+                        <div className="fixed inset-0 bg-[#1B3022] z-[100] p-10 flex flex-col animate-in fade-in duration-300">
                             <button onClick={() => setIsMenuOpen(false)} className="text-white text-3xl font-light ml-auto mb-16">✕</button>
-                            {['command', 'soil_lab', 'wizard', 'shed', 'history', 'resources'].map(v => (
-                                <button key={v} onClick={() => { setView(v); setIsMenuOpen(false); }} className={`text-4xl font-black italic uppercase text-left mb-8 ${view === v ? 'text-[#D4AF37]' : 'text-white'}`}>
-                                    {v.replace('_', ' ')}
+                            {['dashboard', 'soil_lab', 'wizard', 'shed', 'resources'].map(m => (
+                                <button key={m} onClick={() => { setView(m); setIsMenuOpen(false); }} className="menu-item hover:text-[#D4AF37]">
+                                    {m.replace('_', ' ')}
                                 </button>
                             ))}
                         </div>
                     )}
-                    {view === 'command' && <Dashboard />}
-                    {view === 'wizard' && <div className="p-4 text-center py-20 uppercase font-black text-gray-400">Diagnosis Module Loaded</div>}
-                    {/* Other views handled in previous logic blocks remain accessible via state */}
-                    
-                    {activeCitation && <CitationModal />}
+
+                    {view === 'dashboard' && <Dashboard />}
+                    {view === 'soil_lab' && <SoilLabView />}
+                    {view === 'resources' && <ResourcesView />}
+                    {view === 'wizard' && <div className="p-20 text-center font-black uppercase text-gray-300">Diagnostic Module Loaded</div>}
+                    {view === 'shed' && <div className="p-20 text-center font-black uppercase text-gray-400">The Shed is Online</div>}
                 </div>
             );
         };
