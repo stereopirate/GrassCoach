@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Grass Coach - Science-First Turf Management</title>
+    <title>Grass Coach - Professional Intelligence</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -12,155 +12,73 @@
         :root { --forest: #1B3022; --gold: #D4AF37; --turf: #F5F5F5; }
         body { background: var(--turf); font-family: sans-serif; padding-top: 80px; }
         .btn-coach { background: var(--forest); color: var(--gold); font-weight: 800; text-transform: uppercase; border-radius: 0.75rem; }
-        .menu-overlay { background: rgba(27, 48, 34, 0.98); backdrop-filter: blur(10px); z-index: 100; }
-        .logic-card { border-left: 4px solid var(--forest); background: white; padding: 1.25rem; border-radius: 1rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .matrix-pill { font-size: 8px; font-weight: 900; background: #f3f4f6; color: #1B3022; padding: 3px 10px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .logic-probe { cursor: pointer; color: var(--gold); background: rgba(212, 175, 55, 0.1); padding: 0 6px; border-radius: 4px; font-weight: 900; font-size: 10px; }
+        .frac-tag { background: #E5E7EB; color: #1B3022; font-size: 8px; padding: 2px 6px; border-radius: 4px; font-weight: 900; }
+        .citation-overlay { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 2rem; border-radius: 2rem 2rem 0 0; z-index: 100; box-shadow: 0 -10px 40px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState } = React;
 
         const GrassCoachApp = () => {
-            const [view, setView] = useState('knowledge');
+            const [view, setView] = useState('wizard');
+            const [activeCitation, setActiveCitation] = useState(null);
             const [isMenuOpen, setIsMenuOpen] = useState(false);
-            const [selectedSpecies, setSelectedSpecies] = useState('Cool-Season (C3)');
 
-            const Nav = () => (
-                <nav className="fixed top-0 left-0 right-0 bg-white border-b px-6 py-5 flex justify-between items-center z-50">
-                    <div>
-                        <h1 className="text-xl font-black text-[#1B3022] italic tracking-tighter uppercase">Grass Coach</h1>
-                        <p className="text-[8px] font-black text-[#D4AF37] uppercase tracking-widest leading-none mt-1">NTEP Integrated Engine</p>
+            const CITATION_DB = {
+                "frac_3": { org: "FRAC International", logic: "DMI Fungicides (Group 3) inhibit sterol biosynthesis. Do not apply more than twice consecutively to prevent resistance.", link: "https://frac.info" },
+                "winter_stasis": { org: "Ohio State CFAES", logic: "Plant respiration slows to minimal levels below 40°F soil temp. Excessive traffic can rupture frozen cell walls in the crown.", link: "https://turf.osu.edu" }
+            };
+
+            const WizardResult = () => (
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Diagnosis</p>
+                            <h3 className="text-xl font-black text-[#1B3022] uppercase italic">Snow Mold (Typhula)</h3>
+                        </div>
+                        <span className="logic-probe" onClick={() => setActiveCitation("winter_stasis")}>ⓘ INFO</span>
                     </div>
-                    <button onClick={() => setIsMenuOpen(true)} className="flex flex-col gap-1.5 items-end">
-                        <div className="w-6 h-0.5 bg-[#1B3022]"></div>
-                        <div className="w-4 h-0.5 bg-[#1B3022]"></div>
-                    </button>
-                </nav>
-            );
-
-            const KnowledgeView = () => (
-                <div className="p-4 max-w-md mx-auto pb-24">
-                    <h2 className="text-3xl font-black text-[#1B3022] italic uppercase mb-2">Turf Logic Matrix</h2>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-8">Peer-Reviewed Cultivar Science</p>
                     
-                    {/* Selector */}
-                    <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
-                        {['Cool-Season (C3)', 'Warm-Season (C4)', 'Soil Physics'].map(cat => (
-                            <button 
-                                key={cat}
-                                onClick={() => setSelectedSpecies(cat)}
-                                className={`whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${selectedSpecies === cat ? 'bg-[#1B3022] text-white' : 'bg-white text-gray-400 border border-gray-100'}`}
-                            >
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
-
-                    {selectedSpecies === 'Cool-Season (C3)' && (
-                        <div className="animate-in slide-in-from-bottom-4 duration-500">
-                            <div className="logic-card">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-black text-sm text-[#1B3022] uppercase italic">Tall Fescue</h4>
-                                    <span className="matrix-pill">Optimum: 60-75°F</span>
-                                </div>
-                                <p className="text-xs text-gray-500 mb-4 leading-relaxed">Best for Transition Zones (Zone 6-7). Deep root systems (up to 3ft) provide superior drought tolerance over Bluegrass.</p>
-                                <div className="bg-gray-50 p-3 rounded-lg flex justify-between">
-                                    <span className="text-[9px] font-black uppercase opacity-40">Shade Tolerance</span>
-                                    <span className="text-[9px] font-black uppercase text-[#1B3022]">Very Good (4-6 hrs)</span>
-                                </div>
-                            </div>
-                            <div className="logic-card">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-black text-sm text-[#1B3022] uppercase italic">Kentucky Bluegrass</h4>
-                                    <span className="matrix-pill">Optimum: 60-75°F</span>
-                                </div>
-                                <p className="text-xs text-gray-500 mb-4 leading-relaxed">Rhizomatous growth allows for self-repair. High N requirement. Susceptible to Summer Patch in heat stress.</p>
-                                <div className="bg-gray-50 p-3 rounded-lg flex justify-between">
-                                    <span className="text-[9px] font-black uppercase opacity-40">Shade Tolerance</span>
-                                    <span className="text-[9px] font-black uppercase text-[#1B3022]">Poor to Fair</span>
-                                </div>
-                            </div>
+                    <div className="bg-gray-50 p-4 rounded-2xl mb-6">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Recommended Protocol</p>
+                        <p className="text-xs text-gray-500 leading-relaxed font-medium mb-4">
+                            Improve airflow by gently raking. If chemical intervention is required by your local extension...
+                        </p>
+                        <div className="flex gap-2">
+                            <span className="frac-tag uppercase">Group 3 (DMI)</span>
+                            <span className="frac-tag uppercase">Group 11 (QoI)</span>
+                            <span className="logic-probe" onClick={() => setActiveCitation("frac_3")}>ⓘ FRAC LOGIC</span>
                         </div>
-                    )}
-
-                    {selectedSpecies === 'Warm-Season (C4)' && (
-                        <div className="animate-in slide-in-from-bottom-4 duration-500">
-                            <div className="logic-card">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-black text-sm text-[#1B3022] uppercase italic">Bermudagrass</h4>
-                                    <span className="matrix-pill">Optimum: 80-95°F</span>
-                                </div>
-                                <p className="text-xs text-gray-500 mb-4 leading-relaxed">Extreme traffic tolerance. Aggressive lateral growth via stolons and rhizomes. Goes dormant below 50°F soil temp.</p>
-                                <div className="bg-gray-50 p-3 rounded-lg flex justify-between">
-                                    <span className="text-[9px] font-black uppercase opacity-40">Shade Tolerance</span>
-                                    <span className="text-[9px] font-black uppercase text-red-500">Very Poor</span>
-                                </div>
-                            </div>
-                            <div className="logic-card">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-black text-sm text-[#1B3022] uppercase italic">St. Augustine</h4>
-                                    <span className="matrix-pill">Optimum: 80-95°F</span>
-                                </div>
-                                <p className="text-xs text-gray-500 mb-4 leading-relaxed">The king of warm-season shade. Salt-tolerant for coastal regions. Broad leaf texture.</p>
-                                <div className="bg-gray-50 p-3 rounded-lg flex justify-between">
-                                    <span className="text-[9px] font-black uppercase opacity-40">Shade Tolerance</span>
-                                    <span className="text-[9px] font-black uppercase text-[#1B3022]">Excellent (4 hrs min)</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedSpecies === 'Soil Physics' && (
-                        <div className="animate-in slide-in-from-bottom-4 duration-500">
-                            <div className="logic-card">
-                                <h4 className="font-black text-sm text-[#1B3022] uppercase italic mb-2">Cation Exchange Capacity (CEC)</h4>
-                                <p className="text-xs text-gray-500 leading-relaxed">Measures the soil's ability to hold nutrients. High clay/OM = high CEC. Sandy soils = low CEC (requires frequent, low-dose N/K applications).</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-
-            const ResourcesView = () => (
-                <div className="p-4 max-w-md mx-auto">
-                    <h2 className="text-2xl font-black text-[#1B3022] italic uppercase mb-8">Science Repository</h2>
-                    <div className="space-y-4">
-                        {[
-                            {org: "NTEP.org", site: "National Turfgrass Evaluation Program", logic: "Cultivar trial data from 40+ US locations."},
-                            {org: "MSU Extension", site: "Michigan State Turf", logic: "Cool-season disease & GDD modeling."},
-                            {org: "UF/IFAS", site: "University of Florida", logic: "Warm-season shade and irrigation research."},
-                            {org: "Purdue Extension", site: "Turfgrass Science", logic: "Crabgrass germination & pre-emergent timing."}
-                        ].map((s, i) => (
-                            <div key={i} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                                <p className="text-[10px] font-black text-[#D4AF37] uppercase">{s.org}</p>
-                                <h4 className="font-black text-[#1B3022] text-xs uppercase italic mt-1">{s.site}</h4>
-                                <p className="text-[10px] text-gray-500 font-medium leading-relaxed mt-2">{s.logic}</p>
-                            </div>
-                        ))}
                     </div>
                 </div>
             );
 
             return (
                 <div className="min-h-screen">
-                    <Nav />
-                    {isMenuOpen && (
-                        <div className="fixed inset-0 menu-overlay flex flex-col p-10 z-50">
-                            <button onClick={() => setIsMenuOpen(false)} className="text-white text-3xl font-light ml-auto mb-16">✕</button>
-                            {['knowledge', 'resources', 'command'].map(v => (
-                                <button key={v} onClick={() => { setView(v); setIsMenuOpen(false); }} className={`text-4xl font-black italic uppercase text-left mb-8 ${view === v ? 'text-[#D4AF37]' : 'text-white'}`}>
-                                    {v}
-                                </button>
-                            ))}
+                    <nav className="fixed top-0 left-0 right-0 bg-white border-b px-6 py-5 flex justify-between items-center z-50">
+                        <h1 className="text-xl font-black text-[#1B3022] italic tracking-tighter uppercase">Grass Coach</h1>
+                        <button onClick={() => setIsMenuOpen(true)} className="w-6 h-0.5 bg-[#1B3022] relative after:absolute after:top-2 after:left-0 after:w-4 after:h-0.5 after:bg-[#1B3022]"></button>
+                    </nav>
+
+                    <div className="p-4 max-w-md mx-auto">
+                        {view === 'wizard' && <WizardResult />}
+                    </div>
+
+                    {activeCitation && (
+                        <div className="citation-overlay animate-in slide-in-from-bottom duration-300">
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="font-black text-[10px] text-[#D4AF37] uppercase tracking-[0.2em]">{CITATION_DB[activeCitation].org}</h4>
+                                <button onClick={() => setActiveCitation(null)} className="text-gray-300 font-black">CLOSE</button>
+                            </div>
+                            <p className="text-sm font-bold text-[#1B3022] leading-relaxed mb-4">
+                                {CITATION_DB[activeCitation].logic}
+                            </p>
+                            <a href={CITATION_DB[activeCitation].link} target="_blank" className="text-[10px] font-black text-[#1B3022] border-b-2 border-[#1B3022] pb-1 uppercase">Review Primary Source</a>
                         </div>
-                    )}
-                    {view === 'knowledge' && <KnowledgeView />}
-                    {view === 'resources' && <ResourcesView />}
-                    {view === 'command' && (
-                        <div className="p-20 text-center uppercase font-black text-gray-300">Command Center Online</div>
                     )}
                 </div>
             );
