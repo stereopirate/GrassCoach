@@ -10,10 +10,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root { --forest: #1B3022; --gold: #D4AF37; --turf: #F5F5F5; }
-        body { background: var(--turf); font-family: sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--turf); font-family: sans-serif; -webkit-tap-highlight-color: transparent; padding-top: 70px; }
         .coach-card { background: white; border-bottom: 4px solid var(--forest); border-radius: 1.25rem; }
         .btn-coach { background: var(--forest); color: var(--gold); font-weight: 800; text-transform: uppercase; }
-        .nav-active { color: var(--gold); border-bottom: 2px solid var(--gold); }
+        .nav-link { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; transition: all 0.2s; }
+        .nav-link.active { color: var(--forest); border-bottom: 2px solid var(--gold); padding-bottom: 4px; }
         .progress-bar { height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
         .progress-fill { height: 100%; transition: width 0.5s ease-out; }
     </style>
@@ -27,20 +28,23 @@
         const EQUIPMENT_LIBRARY = {
             mowers: [
                 { id: 'w1', category: 'Walk-Behind', brand: 'Honda', name: 'HRX217VKA', interval: 50 },
-                { id: 'z1', category: 'Zero-Turn', brand: 'Ariens', name: 'IKON XD 52', interval: 100 }
+                { id: 'w2', category: 'Walk-Behind', brand: 'Toro', name: 'Personal Pace 21"', interval: 50 },
+                { id: 'r1', category: 'Riding', brand: 'John Deere', name: 'S100', interval: 50 },
+                { id: 'z1', category: 'Zero-Turn', brand: 'Ariens', name: 'IKON XD 52', interval: 100 },
+                { id: 'z2', category: 'Zero-Turn', brand: 'Toro', name: 'TimeCutter 42"', interval: 100 }
             ],
             spreaders: [
-                { id: 's1', brand: 'Scotts', name: 'Elite Spreader', type: 'Broadcast', interval: 25 }
+                { id: 's1', brand: 'Scotts', name: 'Elite Spreader', type: 'Broadcast', interval: 25 },
+                { id: 's2', brand: 'Echo', name: 'RB-60', type: 'Broadcast', interval: 30 }
             ]
         };
 
         const LawnCareTracker = () => {
-            // --- STATE ---
-            const [view, setView] = useState('dashboard');
+            const [view, setView] = useState('command');
             const [equipment, setEquipment] = useState(() => JSON.parse(localStorage.getItem('gc_shed') || '[]'));
             const [activities, setActivities] = useState(() => JSON.parse(localStorage.getItem('gc_activities') || '[]'));
-            const [lawnProfile, setLawnProfile] = useState(() => JSON.parse(localStorage.getItem('gc_profile') || '{"grassType":"Kentucky Bluegrass","size":"5000","ph":"6.5","lastSoilTest":"2026-01-01"}'));
-            const [weather] = useState({ temp: 74, condition: 'Sunny', rainNext24: '0.0"', wind: '5mph' });
+            const [lawnProfile, setLawnProfile] = useState(() => JSON.parse(localStorage.getItem('gc_profile') || '{"grassType":"Kentucky Bluegrass","size":"5000","ph":"6.5"}'));
+            const [weather] = useState({ temp: 74, condition: 'Sunny', rainNext24: '0.0"', etRate: 'Low' });
 
             useEffect(() => {
                 localStorage.setItem('gc_shed', JSON.stringify(equipment));
@@ -48,89 +52,55 @@
                 localStorage.setItem('gc_profile', JSON.stringify(lawnProfile));
             }, [equipment, activities, lawnProfile]);
 
-            // --- COMPONENTS ---
+            const addEquipmentToShed = (model) => {
+                const newTool = { ...model, id: Date.now(), hoursUsed: 0 };
+                setEquipment(prev => [...prev, newTool]);
+            };
 
-            const WeatherModule = () => (
-                <div className="bg-[#1B3022] rounded-3xl p-6 text-white mb-6 shadow-xl">
-                    <div className="flex justify-between items-start mb-4">
-                        <div>
-                            <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Field Conditions</p>
-                            <h3 className="text-3xl font-black">{weather.temp}°F</h3>
-                            <p className="text-sm opacity-80 font-bold">{weather.condition}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest">Precip</p>
-                            <p className="text-xl font-black">{weather.rainNext24}</p>
-                        </div>
-                    </div>
-                    <div className="pt-4 border-t border-white/10 flex justify-between">
-                        <span className="text-[10px] font-bold uppercase opacity-60">Evapotranspiration: Low</span>
-                        <span className="text-[10px] font-bold uppercase text-[#D4AF37]">Mowing Recommended</span>
-                    </div>
-                </div>
-            );
+            const resetService = (id) => {
+                setEquipment(prev => prev.map(t => t.id === id ? { ...t, hoursUsed: 0 } : t));
+            };
 
-            const SoilView = () => (
-                <div className="p-4 pb-24 max-w-md mx-auto">
-                    <header className="mb-8">
-                        <h2 className="text-2xl font-black text-[#1B3022] italic uppercase">My Lawn Profile</h2>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Soil & Grass Data</p>
-                    </header>
-                    <div className="bg-white p-6 rounded-3xl space-y-6 shadow-sm">
-                        <div>
-                            <label className="text-[10px] font-black text-gray-400 uppercase">Grass Variety</label>
-                            <select value={lawnProfile.grassType} onChange={(e) => setLawnProfile({...lawnProfile, grassType: e.target.value})} className="w-full text-lg font-bold border-b py-2 outline-none">
-                                <option>Kentucky Bluegrass</option>
-                                <option>Tall Fescue</option>
-                                <option>Bermuda</option>
-                                <option>St. Augustine</option>
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
+            // --- VIEW: COMMAND CENTER (FORMERLY THE FIELD) ---
+            const CommandCenter = () => (
+                <div className="p-4 max-w-md mx-auto">
+                    <div className="bg-[#1B3022] rounded-3xl p-6 text-white mb-6 shadow-xl">
+                        <div className="flex justify-between items-start mb-6">
                             <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase">Soil pH</label>
-                                <input type="number" step="0.1" value={lawnProfile.ph} onChange={(e) => setLawnProfile({...lawnProfile, ph: e.target.value})} className="w-full text-lg font-bold border-b py-2 outline-none" />
+                                <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-1">Command Center</p>
+                                <h3 className="text-3xl font-black">{weather.temp}°F</h3>
+                                <p className="text-sm opacity-80 font-bold uppercase tracking-tighter">{weather.condition}</p>
                             </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase">Sq Footage</label>
-                                <input type="number" value={lawnProfile.size} onChange={(e) => setLawnProfile({...lawnProfile, size: e.target.value})} className="w-full text-lg font-bold border-b py-2 outline-none" />
+                            <div className="text-right">
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Precip (24h)</p>
+                                <p className="text-xl font-black">{weather.rainNext24}</p>
                             </div>
                         </div>
-                    </div>
-                    <button onClick={() => setView('dashboard')} className="w-full mt-8 py-4 bg-[#1B3022] text-[#D4AF37] rounded-xl font-black uppercase">Save Profile</button>
-                </div>
-            );
-
-            const Dashboard = () => (
-                <div className="p-4 pb-24 max-w-md mx-auto">
-                    <header className="flex justify-between items-center mb-8">
-                        <div>
-                            <h1 className="text-3xl font-black text-[#1B3022] tracking-tighter italic">GRASS COACH</h1>
+                        <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                            <span className="text-[10px] font-bold uppercase opacity-60">ET Rate: {weather.etRate}</span>
+                            <span className="text-[10px] font-black uppercase text-[#D4AF37] border border-[#D4AF37]/30 px-2 py-1 rounded">Optimal Mowing</span>
                         </div>
-                        <div className="h-10 w-10 border-2 border-[#1B3022] flex items-center justify-center font-black text-[#1B3022] text-xs">V5.5</div>
-                    </header>
+                    </div>
 
-                    <WeatherModule />
-
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                        <div onClick={() => setView('soil')} className="coach-card p-5 cursor-pointer active:scale-95 transition-all">
-                            <p className="text-[10px] font-black text-gray-400 uppercase mb-1">My Lawn</p>
-                            <p className="font-black text-[#1B3022] text-sm truncate">{lawnProfile.grassType}</p>
+                    <div className="grid grid-cols-2 gap-3 mb-8">
+                        <div onClick={() => setView('lawn')} className="coach-card p-5 cursor-pointer">
+                            <p className="text-[10px] font-black text-gray-400 uppercase mb-2">My Lawn</p>
+                            <p className="font-black text-[#1B3022] text-xs truncate uppercase mb-1">{lawnProfile.grassType}</p>
                             <p className="text-[10px] font-bold text-[#D4AF37] uppercase">{lawnProfile.ph} pH</p>
                         </div>
-                        <div onClick={() => setView('shed')} className="coach-card p-5 border-[#D4AF37] cursor-pointer active:scale-95 transition-all">
-                            <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Shed Status</p>
+                        <div onClick={() => setView('shed')} className="coach-card p-5 cursor-pointer">
+                            <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Shed Status</p>
                             <p className="font-black text-[#1B3022] text-xl">{equipment.length} Tools</p>
-                            <p className="text-[10px] font-bold text-green-600 uppercase">Healthy</p>
+                            <p className="text-[10px] font-bold text-green-600 uppercase">Operational</p>
                         </div>
                     </div>
 
-                    <button className="w-full py-5 btn-coach rounded-xl shadow-lg active:scale-95 transition-all text-sm mb-10">Add Field Entry</button>
+                    <button className="w-full py-5 btn-coach rounded-xl shadow-lg active:scale-95 transition-all text-sm mb-10">Log Activity +</button>
 
-                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4 px-1">Game Tape (Recent)</h3>
+                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Activity Stream</h3>
                     <div className="space-y-3">
                         {activities.length === 0 ? (
-                            <div className="bg-white/50 border-2 border-dashed border-gray-200 p-8 rounded-2xl text-center text-[10px] font-black text-gray-300 uppercase">No sessions logged</div>
+                            <div className="p-8 border-2 border-dashed border-gray-200 rounded-2xl text-center text-[10px] font-black text-gray-300 uppercase">Ready for season start</div>
                         ) : (
                             activities.map(a => (
                                 <div key={a.id} className="bg-white p-4 rounded-xl border border-gray-100 flex justify-between font-bold text-xs">
@@ -143,29 +113,110 @@
                 </div>
             );
 
-            // Placeholder for ShedView from previous turn (simplified for space)
-            const ShedView = () => (
-                <div className="p-4 pb-24 max-w-md mx-auto">
-                    <h2 className="text-2xl font-black text-[#1B3022] italic uppercase mb-8">The Shed</h2>
-                    {equipment.map(tool => (
-                        <div key={tool.id} className="bg-white p-5 rounded-2xl mb-4 border border-gray-100">
-                            <p className="text-[9px] font-black text-[#D4AF37] uppercase">{tool.brand}</p>
-                            <h4 className="font-bold text-[#1B3022] mb-3">{tool.name}</h4>
-                            <div className="progress-bar"><div className="progress-fill bg-[#1B3022]" style={{width: '40%'}}></div></div>
+            // --- VIEW: THE SHED ---
+            const ShedView = () => {
+                const [isAdding, setIsAdding] = useState(false);
+                const [search, setSearch] = useState('');
+
+                return (
+                    <div className="p-4 max-w-md mx-auto">
+                        <header className="mb-8 flex justify-between items-end">
+                            <div>
+                                <h2 className="text-2xl font-black text-[#1B3022] italic uppercase">The Shed</h2>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Maintenance & Fleet</p>
+                            </div>
+                            <button onClick={() => setIsAdding(!isAdding)} className="text-[10px] font-black uppercase border-b-2 border-forest">
+                                {isAdding ? 'Close Library' : '+ Add Tool'}
+                            </button>
+                        </header>
+
+                        {isAdding && (
+                            <div className="bg-white p-6 rounded-3xl shadow-xl border-2 border-[#1B3022] mb-8">
+                                <input placeholder="Search Library..." className="w-full p-4 bg-gray-100 rounded-xl mb-4 outline-none font-bold" onChange={(e) => setSearch(e.target.value.toLowerCase())} />
+                                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                                    {[...EQUIPMENT_LIBRARY.mowers, ...EQUIPMENT_LIBRARY.spreaders]
+                                        .filter(m => m.brand.toLowerCase().includes(search) || m.name.toLowerCase().includes(search))
+                                        .map(m => (
+                                            <div key={m.id} onClick={() => { addEquipmentToShed(m); setIsAdding(false); }} className="p-4 border border-gray-100 rounded-xl flex justify-between items-center hover:bg-gray-50 cursor-pointer">
+                                                <div><p className="text-[9px] font-black text-[#D4AF37] uppercase">{m.brand}</p><p className="font-bold text-sm text-[#1B3022]">{m.name}</p></div>
+                                                <span className="text-[9px] font-black bg-gray-50 px-2 py-1 rounded text-gray-400 uppercase">Select</span>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-6">
+                            {equipment.map(tool => {
+                                const percent = Math.min((tool.hoursUsed / tool.interval) * 100, 100);
+                                return (
+                                    <div key={tool.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <p className="text-[9px] font-black text-[#D4AF37] uppercase">{tool.brand} • {tool.category || tool.type}</p>
+                                                <h4 className="font-bold text-[#1B3022]">{tool.name}</h4>
+                                            </div>
+                                            <button onClick={() => setEquipment(equipment.filter(x => x.id !== tool.id))} className="text-gray-300 text-xs font-black">✕</button>
+                                        </div>
+                                        <div className="mb-2 flex justify-between items-center">
+                                            <span className="text-[9px] font-black text-gray-400 uppercase">Service Life Used</span>
+                                            <span className="text-[9px] font-black text-[#1B3022] uppercase">{Math.round(percent)}%</span>
+                                        </div>
+                                        <div className="progress-bar mb-4">
+                                            <div className="progress-fill bg-[#1B3022]" style={{ width: `${percent}%` }}></div>
+                                        </div>
+                                        <div className="flex justify-between items-center pt-2">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">{tool.hoursUsed} / {tool.interval} Hours</p>
+                                            <button onClick={() => resetService(tool.id)} className="text-[9px] font-black text-[#1B3022] border-b border-[#1B3022] uppercase">Reset Service</button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    ))}
-                    <button onClick={() => setView('dashboard')} className="w-full py-4 text-gray-400 font-bold uppercase text-[10px] tracking-widest">Back</button>
+                    </div>
+                );
+            };
+
+            // --- VIEW: MY LAWN ---
+            const LawnView = () => (
+                <div className="p-4 max-w-md mx-auto">
+                    <header className="mb-8">
+                        <h2 className="text-2xl font-black text-[#1B3022] italic uppercase">My Lawn</h2>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Soil & Grass Profile</p>
+                    </header>
+                    <div className="bg-white p-6 rounded-3xl space-y-8 shadow-sm border border-gray-100">
+                        <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase mb-2 block">Grass Variety</label>
+                            <select value={lawnProfile.grassType} onChange={(e) => setLawnProfile({...lawnProfile, grassType: e.target.value})} className="w-full text-lg font-bold bg-transparent border-b py-2 outline-none uppercase">
+                                <option>Kentucky Bluegrass</option><option>Tall Fescue</option><option>Bermuda</option><option>St. Augustine</option>
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-8">
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase mb-2 block">Soil pH</label>
+                                <input type="number" step="0.1" value={lawnProfile.ph} onChange={(e) => setLawnProfile({...lawnProfile, ph: e.target.value})} className="w-full text-xl font-bold border-b py-2 outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase mb-2 block">Square Feet</label>
+                                <input type="number" value={lawnProfile.size} onChange={(e) => setLawnProfile({...lawnProfile, size: e.target.value})} className="w-full text-xl font-bold border-b py-2 outline-none" />
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={() => setView('command')} className="w-full mt-8 py-5 bg-[#1B3022] text-[#D4AF37] rounded-xl font-black uppercase shadow-lg">Lock In Profile</button>
                 </div>
             );
 
             return (
                 <div className="min-h-screen">
-                    {view === 'dashboard' ? <Dashboard /> : view === 'soil' ? <SoilView /> : <ShedView />}
-                    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t px-12 py-6 flex justify-between items-center z-40">
-                        <button onClick={() => setView('dashboard')} className={`text-[10px] font-black uppercase tracking-widest ${view === 'dashboard' ? 'nav-active' : 'text-gray-300'}`}>Field</button>
-                        <button onClick={() => setView('soil')} className={`text-[10px] font-black uppercase tracking-widest ${view === 'soil' ? 'nav-active' : 'text-gray-300'}`}>Lawn</button>
-                        <button onClick={() => setView('shed')} className={`text-[10px] font-black uppercase tracking-widest ${view === 'shed' ? 'nav-active' : 'text-gray-300'}`}>Shed</button>
+                    <nav className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b px-6 py-5 flex justify-around items-center z-50">
+                        <button onClick={() => setView('command')} className={`nav-link ${view === 'command' ? 'active' : ''}`}>Command</button>
+                        <button onClick={() => setView('lawn')} className={`nav-link ${view === 'lawn' ? 'active' : ''}`}>My Lawn</button>
+                        <button onClick={() => setView('shed')} className={`nav-link ${view === 'shed' ? 'active' : ''}`}>Shed</button>
                     </nav>
+
+                    {view === 'command' && <CommandCenter />}
+                    {view === 'lawn' && <LawnView />}
+                    {view === 'shed' && <ShedView />}
                 </div>
             );
         };
