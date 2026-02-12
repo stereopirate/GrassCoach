@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Grass Coach - Fleet & Ledger</title>
+    <title>Grass Coach - Fleet v7.4</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -13,9 +13,11 @@
         body { background: var(--turf); font-family: sans-serif; padding-top: 80px; }
         .btn-coach { background: var(--forest); color: var(--gold); font-weight: 800; text-transform: uppercase; border-radius: 0.75rem; }
         .card-shadow { box-shadow: 0 10px 30px -5px rgba(0,0,0,0.08); }
-        .modal-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 200; }
-        .input-field { width: 100%; border-bottom: 2px solid #e5e7eb; padding: 8px 0; outline: none; font-weight: 800; text-transform: uppercase; font-size: 12px; }
-        .input-field:focus { border-color: var(--gold); }
+        .modal-overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 200; }
+        .mower-accent { border-left: 5px solid #3b82f6; }
+        .spreader-accent { border-left: 5px solid #ef4444; }
+        .custom-accent { border-left: 5px solid var(--gold); }
+        .tab-btn { font-[900] uppercase text-[10px] tracking-widest pb-2 border-b-2 transition-all; }
     </style>
 </head>
 <body>
@@ -28,122 +30,144 @@
             const [view, setView] = useState('dashboard');
             const [isMenuOpen, setIsMenuOpen] = useState(false);
             const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+            const [modalTab, setModalTab] = useState('Mower');
 
-            // --- PERSISTENT DATA ---
-            const [shed, setShed] = useState(() => JSON.parse(localStorage.getItem('gc_shed_v2') || '[]'));
-            const [logs, setLogs] = useState(() => JSON.parse(localStorage.getItem('gc_logs_v2') || '[]'));
-
-            useEffect(() => {
-                localStorage.setItem('gc_shed_v2', JSON.stringify(shed));
-                localStorage.setItem('gc_logs_v2', JSON.stringify(logs));
-            }, [shed, logs]);
-
-            // --- SHED LOGIC ---
-            const PRESETS = [
-                { name: "Honda HRX217", type: "Mower", brand: "Honda" },
-                { name: "Scotts Elite", type: "Spreader", brand: "Scotts" },
-                { name: "Echo SRM-225", type: "Trimmer", brand: "Echo" }
-            ];
-
-            const addEquipment = (item) => {
-                const newEntry = { 
-                    ...item, 
-                    id: Date.now(), 
-                    lastSharpened: item.type === 'Mower' ? 'Not Set' : 'N/A' 
-                };
-                setShed([newEntry, ...shed]);
-                setIsAddModalOpen(false);
+            // --- THE COMPREHENSIVE EQUIPMENT DATABASE ---
+            const MASTER_DATABASE = {
+                Mower: [
+                    { name: "TimeMaster 30\"", brand: "Toro", cat: "Wide-Area Walk" },
+                    { name: "HRX217VKA", brand: "Honda", cat: "Residential" },
+                    { name: "Super Recycler", brand: "Toro", cat: "Residential" },
+                    { name: "LM2135SP", brand: "EGO Power+", cat: "Battery" },
+                    { name: "Commercial 21\"", brand: "Honda", cat: "Commercial" },
+                    { name: "Personal Pace 22\"", brand: "Toro", cat: "Residential" },
+                    { name: "JS48", brand: "John Deere", cat: "Residential" },
+                    { name: "R322iX", brand: "Husqvarna", cat: "Rider" },
+                    { name: "Ultima ZT1", brand: "Cub Cadet", cat: "Zero-Turn" },
+                    { name: "Z335E", brand: "John Deere", cat: "Zero-Turn" }
+                ],
+                Spreader: [
+                    { name: "RB-60", brand: "Echo", cat: "Broadcast" },
+                    { name: "Elite Spreader", brand: "Scotts", cat: "Broadcast" },
+                    { name: "2150 Commercial", brand: "EarthWay", type: "Broadcast" },
+                    { name: "EdgeGuard DLX", brand: "Scotts", cat: "Residential" },
+                    { name: "C-Series", brand: "Spyker", cat: "Commercial" },
+                    { name: "Lesco 80lb", brand: "Lesco", cat: "Commercial High-Wheel" },
+                    { name: "Solo 421", brand: "Solo", cat: "Chest Spreader" }
+                ]
             };
 
-            // --- VIEWS ---
+            const [shed, setShed] = useState(() => JSON.parse(localStorage.getItem('gc_v7_shed') || '[]'));
+            const [customEntry, setCustomEntry] = useState({ name: '', brand: '', type: 'Other' });
+
+            useEffect(() => { localStorage.setItem('gc_v7_shed', JSON.stringify(shed)); }, [shed]);
+
+            const addToShed = (item, isCustom = false) => {
+                const newInstance = {
+                    ...item,
+                    instanceId: Date.now(),
+                    lastMaint: '',
+                    setting: item.type === 'Spreader' ? 'Auto' : null
+                };
+                setShed([newInstance, ...shed]);
+                setIsAddModalOpen(false);
+                setCustomEntry({ name: '', brand: '', type: 'Other' });
+            };
+
+            // --- COMPONENTS ---
             const Dashboard = () => (
-                <div className="p-4 max-w-md mx-auto">
-                    <div className="bg-[#1B3022] rounded-[2.5rem] p-8 text-white mb-6 shadow-2xl">
-                        <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-1">Columbus, OH (43235)</p>
-                        <h3 className="text-4xl font-black italic">39°F</h3>
-                        <p className="text-[10px] font-black opacity-40 uppercase mt-4">Current Status: Dormant</p>
+                <div className="p-4 max-w-md mx-auto animate-in fade-in duration-500">
+                    <div className="bg-[#1B3022] rounded-[2.5rem] p-8 text-white mb-6 shadow-2xl relative overflow-hidden">
+                        <div className="flex justify-between items-start mb-10">
+                            <div>
+                                <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-1">Columbus, OH</p>
+                                <h3 className="text-5xl font-black italic">39°F</h3>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[10px] font-black opacity-30 uppercase">Soil Temp</p>
+                                <p className="text-2xl font-black text-[#D4AF37]">32°F</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl">
+                            <span className="text-[10px] font-black uppercase tracking-widest">Season Progress</span>
+                            <span className="text-[10px] font-black text-[#D4AF37]">8%</span>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
                         <button onClick={() => setView('shed')} className="bg-white p-6 rounded-3xl card-shadow text-left">
-                            <span className="block text-[10px] font-black text-gray-400 uppercase mb-2">Fleet</span>
-                            <span className="block font-black text-[#1B3022] uppercase italic text-xs">The Shed</span>
+                            <p className="text-[10px] font-black text-gray-300 uppercase mb-1">Fleet</p>
+                            <p className="font-black text-[#1B3022] italic uppercase text-sm">The Shed</p>
                         </button>
-                        <button onClick={() => setView('history')} className="bg-white p-6 rounded-3xl card-shadow text-left">
-                            <span className="block text-[10px] font-black text-gray-400 uppercase mb-2">Ledger</span>
-                            <span className="block font-black text-[#1B3022] uppercase italic text-xs">History</span>
+                        <button onClick={() => setView('soil_lab')} className="bg-white p-6 rounded-3xl card-shadow text-left">
+                            <p className="text-[10px] font-black text-gray-300 uppercase mb-1">Physics</p>
+                            <p className="font-black text-[#1B3022] italic uppercase text-sm">Soil Lab</p>
                         </button>
                     </div>
+                    <button onClick={() => setView('history')} className="w-full py-5 bg-white rounded-3xl card-shadow font-black italic uppercase text-[#1B3022] text-xs tracking-widest">View Activity Ledger</button>
                 </div>
             );
 
             const ShedView = () => (
-                <div className="p-4 max-w-md mx-auto pb-24">
+                <div className="p-4 max-w-md mx-auto pb-32">
                     <div className="flex justify-between items-center mb-8">
                         <h2 className="text-3xl font-black text-[#1B3022] italic uppercase">The Shed</h2>
-                        <button onClick={() => setIsAddModalOpen(true)} className="bg-[#1B3022] text-[#D4AF37] px-4 py-2 rounded-full font-black text-[10px] uppercase">Add Tool</button>
+                        <button onClick={() => setIsAddModalOpen(true)} className="bg-[#1B3022] text-[#D4AF37] px-6 py-3 rounded-full font-black text-[10px] uppercase shadow-lg">+ Register Tool</button>
                     </div>
                     <div className="space-y-4">
-                        {shed.map(item => (
-                            <div key={item.id} className="bg-white p-6 rounded-2xl card-shadow">
+                        {shed.map(tool => (
+                            <div key={tool.instanceId} className={`bg-white p-6 rounded-2xl card-shadow ${tool.type === 'Mower' ? 'mower-accent' : tool.type === 'Spreader' ? 'spreader-accent' : 'custom-accent'}`}>
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase">{item.brand}</p>
-                                        <h4 className="font-black text-[#1B3022] text-sm uppercase italic">{item.name}</h4>
+                                        <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">{tool.brand}</p>
+                                        <h4 className="font-black text-[#1B3022] text-sm uppercase italic">{tool.name}</h4>
                                     </div>
-                                    <button onClick={() => setShed(shed.filter(i => i.id !== item.id))} className="text-gray-300 text-[10px] font-black uppercase">Remove</button>
+                                    <button onClick={() => setShed(shed.filter(t => t.instanceId !== tool.instanceId))} className="text-[8px] font-black text-gray-300 uppercase">Delete</button>
                                 </div>
-                                {item.type === 'Mower' && (
-                                    <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Blade Sharpened</span>
-                                        <input 
-                                            type="date" 
-                                            className="text-[10px] font-black text-[#D4AF37] bg-transparent outline-none"
-                                            value={item.lastSharpened === 'Not Set' ? '' : item.lastSharpened}
-                                            onChange={(e) => {
-                                                setShed(shed.map(i => i.id === item.id ? {...i, lastSharpened: e.target.value} : i));
-                                            }}
-                                        />
-                                    </div>
-                                )}
+                                <div className="pt-4 border-t border-gray-50">
+                                    {tool.type === 'Mower' && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[9px] font-black text-gray-400 uppercase">Blade Challenge</span>
+                                            <input type="date" value={tool.lastMaint} onChange={(e) => setShed(shed.map(t => t.instanceId === tool.instanceId ? {...t, lastMaint: e.target.value} : t))} className="text-[10px] font-black text-[#D4AF37] outline-none" />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
                 </div>
             );
 
-            const HistoryView = () => (
-                <div className="p-4 max-w-md mx-auto">
-                    <h2 className="text-3xl font-black text-[#1B3022] italic uppercase mb-8">History</h2>
-                    {logs.length === 0 ? (
-                        <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl">
-                            <p className="text-[10px] font-black text-gray-300 uppercase">No Activity Recorded</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {logs.map(log => (
-                                <div key={log.id} className="bg-white p-4 rounded-xl flex justify-between items-center card-shadow">
-                                    <span className="font-black text-[10px] text-[#1B3022] uppercase">{log.type}</span>
-                                    <span className="text-gray-300 font-black text-[10px]">{log.date}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            );
-
             const AddModal = () => (
-                <div className="fixed inset-0 modal-overlay flex items-center justify-center p-6">
-                    <div className="bg-white w-full max-w-xs rounded-3xl p-8 animate-in zoom-in-95 duration-200">
-                        <h3 className="text-lg font-black text-[#1B3022] italic uppercase mb-6">Register Tool</h3>
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-4 tracking-widest">Quick Presets</p>
-                        <div className="space-y-2 mb-8">
-                            {PRESETS.map(p => (
-                                <button key={p.name} onClick={() => addEquipment(p)} className="w-full text-left p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                                    <p className="text-[10px] font-black text-[#1B3022] uppercase">{p.name}</p>
-                                </button>
+                <div className="fixed inset-0 modal-overlay flex items-end">
+                    <div className="bg-white w-full rounded-t-[3rem] p-8 animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-2xl font-black text-[#1B3022] italic uppercase">Fleet Library</h3>
+                            <button onClick={() => setIsAddModalOpen(false)} className="bg-gray-100 h-8 w-8 rounded-full font-black">✕</button>
+                        </div>
+                        
+                        <div className="flex gap-6 mb-8 border-b border-gray-100">
+                            {['Mower', 'Spreader', 'Other'].map(tab => (
+                                <button key={tab} onClick={() => setModalTab(tab)} className={`tab-btn ${modalTab === tab ? 'border-[#1B3022] text-[#1B3022]' : 'border-transparent text-gray-300'}`}>{tab}</button>
                             ))}
                         </div>
-                        <button onClick={() => setIsAddModalOpen(false)} className="w-full text-[10px] font-black text-gray-300 uppercase py-2">Cancel</button>
+
+                        <div className="space-y-3">
+                            {modalTab !== 'Other' ? MASTER_DATABASE[modalTab].map((p, i) => (
+                                <button key={i} onClick={() => addToShed({...p, type: modalTab})} className="w-full text-left p-5 rounded-2xl bg-gray-50 flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[8px] font-black text-blue-500 uppercase">{p.brand}</p>
+                                        <p className="font-black text-[#1B3022] text-xs uppercase italic">{p.name}</p>
+                                    </div>
+                                    <span className="text-[10px] font-black text-gray-200">ADD</span>
+                                </button>
+                            )) : (
+                                <div className="space-y-4 pt-4">
+                                    <input placeholder="BRAND (E.G. TORO)" className="w-full p-4 bg-gray-50 rounded-xl font-black text-[10px] uppercase outline-none" onChange={e => setCustomEntry({...customEntry, brand: e.target.value})} />
+                                    <input placeholder="MODEL (E.G. 30 INCH)" className="w-full p-4 bg-gray-50 rounded-xl font-black text-[10px] uppercase outline-none" onChange={e => setCustomEntry({...customEntry, name: e.target.value})} />
+                                    <button onClick={() => addToShed(customEntry)} className="w-full py-4 btn-coach text-[10px] tracking-widest mt-4">Register Custom Tool</button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -151,17 +175,14 @@
             return (
                 <div className="min-h-screen">
                     <nav className="fixed top-0 left-0 right-0 bg-white border-b px-6 py-5 flex justify-between items-center z-50">
-                        <h1 onClick={() => setView('dashboard')} className="text-xl font-black text-[#1B3022] italic tracking-tighter uppercase cursor-pointer">Grass Coach</h1>
-                        <button onClick={() => setIsMenuOpen(true)} className="flex flex-col gap-1.5 items-end">
-                            <div className="w-6 h-0.5 bg-[#1B3022]"></div>
-                            <div className="w-4 h-0.5 bg-[#1B3022]"></div>
-                        </button>
+                        <h1 onClick={() => setView('dashboard')} className="text-xl font-black text-[#1B3022] italic tracking-tighter uppercase cursor-pointer leading-none">Grass Coach</h1>
+                        <button onClick={() => setIsMenuOpen(true)} className="flex flex-col gap-1.5 items-end"><div className="w-6 h-0.5 bg-[#1B3022]"></div><div className="w-4 h-0.5 bg-[#1B3022]"></div></button>
                     </nav>
 
                     {isMenuOpen && (
                         <div className="fixed inset-0 bg-[#1B3022] z-[100] p-10 flex flex-col">
                             <button onClick={() => setIsMenuOpen(false)} className="text-white text-3xl font-light ml-auto mb-16">✕</button>
-                            {['dashboard', 'shed', 'history', 'soil_lab', 'resources'].map(m => (
+                            {['dashboard', 'shed', 'soil_lab', 'history', 'resources'].map(m => (
                                 <button key={m} onClick={() => { setView(m); setIsMenuOpen(false); }} className="text-4xl font-black italic uppercase text-white text-left mb-8 hover:text-[#D4AF37]">{m.replace('_', ' ')}</button>
                             ))}
                         </div>
@@ -169,9 +190,9 @@
 
                     {view === 'dashboard' && <Dashboard />}
                     {view === 'shed' && <ShedView />}
-                    {view === 'history' && <HistoryView />}
-                    {view === 'soil_lab' && <div className="p-20 uppercase font-black text-gray-300">Soil Data Active</div>}
-                    {view === 'resources' && <div className="p-20 uppercase font-black text-gray-300">Science Library Loaded</div>}
+                    {view === 'soil_lab' && <div className="p-10 font-black uppercase text-gray-300">Soil Lab Active</div>}
+                    {view === 'history' && <div className="p-10 font-black uppercase text-gray-300">Ledger Online</div>}
+                    {view === 'resources' && <div className="p-10 font-black uppercase text-gray-300">Science Library Loaded</div>}
                     
                     {isAddModalOpen && <AddModal />}
                 </div>
