@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Yardly - Agronomy Build</title>
+    <title>Yardly - Full System v8.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
-        :root { --yardly-green: #2D5A27; --growth-lime: #A2D149; --bg-soft: #F9FBF9; }
-        body { background-color: var(--bg-soft); font-family: 'Outfit', sans-serif; color: #333; padding-top: 80px; }
-        .card-luxe { background: white; border-radius: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #eee; }
-        .seed-badge { font-size: 9px; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; }
-        .kbg { background: #E0F2FE; color: #0369A1; } /* Blue for Bluegrass */
-        .tf { background: #DCFCE7; color: #166534; }  /* Green for Fescue */
+        :root { --yardly-green: #2D5A27; --growth-lime: #A2D149; }
+        body { background-color: #F8FAFC; font-family: 'Outfit', sans-serif; color: #1E293B; padding-top: 80px; }
+        .card-luxe { background: white; border-radius: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #F1F5F9; }
+        .nav-active { color: var(--yardly-green); border-bottom: 2px solid var(--yardly-green); }
+        .alert-ring { position: relative; }
+        .alert-ring::after { content: ''; position: absolute; top: 0; right: 0; width: 8px; height: 8px; background: #EF4444; border-radius: 50%; border: 2px solid white; }
     </style>
 </head>
 <body>
@@ -28,106 +28,157 @@
             const [view, setView] = useState('dashboard');
             const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-            // --- SEED & CULTIVAR DATA ---
-            const [myYard, setMyYard] = useState(() => JSON.parse(localStorage.getItem('yardly_my_yard') || '{"grassType": "Kentucky Bluegrass", "sqFt": "5000"}'));
-            
-            const SEED_RESEARCH = [
-                { type: "Kentucky Bluegrass", optTemp: "60-75°F", germ: "14-21 Days", use: "Premium look, self-repairing (Rhizomes)." },
-                { type: "Turf Type Tall Fescue", optTemp: "60-75°F", germ: "7-12 Days", use: "Drought hardy, deep roots, bunch-type." },
-                { type: "Perennial Ryegrass", optTemp: "60-75°F", germ: "5-7 Days", use: "Nurse crop, fast green-up, high traffic." }
-            ];
+            // --- SHARED DATA STATE ---
+            const [profile, setProfile] = useState(() => JSON.parse(localStorage.getItem('yardly_pro_v8') || '{"grassType": "TTTF/KBG Mix", "zip": "43235", "zone": "6b", "soil": "Silty Clay", "ph": "6.5"}'));
+            const [shed, setShed] = useState(() => JSON.parse(localStorage.getItem('yardly_shed_v8') || '[{"id":1, "brand":"Toro", "name":"TimeMaster 30\\"", "type":"Mower", "lastSharp":"2025-11-15"}]'));
 
-            // --- VIEW MODULES ---
+            useEffect(() => {
+                localStorage.setItem('yardly_pro_v8', JSON.stringify(profile));
+                localStorage.setItem('yardly_shed_v8', JSON.stringify(shed));
+            }, [profile, shed]);
+
+            // --- WEATHER & METRICS ---
+            const metrics = {
+                temp: 39,
+                soilTemp: 32,
+                wind: "12 mph NW",
+                humidity: "64%",
+                gdd: 0, // Growing Degree Days
+                status: "Dormant"
+            };
+
+            // --- COMPONENTS ---
             const Dashboard = () => (
-                <div className="px-6 max-w-md mx-auto animate-in fade-in">
-                    <div className="mb-8">
-                        <h2 className="text-3xl font-800 tracking-tight">Strategy for <span className="text-[#2D5A27]">{myYard.grassType}</span></h2>
-                        <p className="text-gray-400 font-medium uppercase text-[10px] tracking-widest mt-1">43235 • Transition Zone</p>
+                <div className="px-6 max-w-md mx-auto animate-in fade-in duration-500">
+                    <div className="mb-6">
+                        <h2 className="text-3xl font-800 tracking-tight text-slate-900">Hello, <span className="text-[#2D5A27]">Coach</span></h2>
+                        <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-1">Zip: {profile.zip} • {metrics.status}</p>
                     </div>
 
-                    <div className="card-luxe p-6 mb-6">
-                        <h3 className="text-sm font-800 uppercase text-[#2D5A27] mb-4">Overseeding Window</h3>
-                        <div className="flex items-center gap-4 mb-4">
-                            <div className="flex-1 bg-gray-50 p-4 rounded-xl text-center">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase">Spring</p>
-                                <p className="font-800 text-gray-400">Locked</p>
-                            </div>
-                            <div className="flex-1 bg-[#DCFCE7] p-4 rounded-xl text-center border border-[#A2D149]">
-                                <p className="text-[10px] font-bold text-[#166534] uppercase">Fall</p>
-                                <p className="font-800 text-[#166534]">Optimal</p>
-                            </div>
+                    {/* Weather Grid */}
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                        <div className="card-luxe p-4">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">Air Temp</p>
+                            <p className="text-2xl font-800 text-slate-800">{metrics.temp}°F</p>
                         </div>
-                        <p className="text-xs leading-relaxed text-gray-500 font-medium">
-                            In Columbus, spring overseeding is risky due to high weed pressure. Fall (Late Aug/Early Sept) is the gold standard when soil temps are 65-70°F.
-                        </p>
+                        <div className="card-luxe p-4 border-l-4 border-[#A2D149]">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">Soil Temp</p>
+                            <p className="text-2xl font-800 text-slate-800">{metrics.soilTemp}°F</p>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                        <button onClick={() => setView('research')} className="w-full p-6 card-luxe text-left flex justify-between items-center">
-                            <div>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase">Library</p>
-                                <p className="font-800 text-[#2D5A27]">Seed & Science</p>
-                            </div>
-                            <span className="text-2xl">🌱</span>
+                    {/* Scientific Insight Card */}
+                    <div className="card-luxe p-6 mb-6 bg-[#2D5A27] text-white">
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A2D149]">Agronomy Alert</span>
+                            <span className="text-xs">❄️</span>
+                        </div>
+                        <p className="text-sm font-semibold leading-relaxed mb-4">
+                            Soil is currently {metrics.soilTemp}°F. Micro-organisms are inactive. Avoid heavy foot traffic to prevent crown damage on your {profile.grassType}.
+                        </p>
+                        <div className="flex justify-between text-[10px] font-bold opacity-60">
+                            <span>GDD: {metrics.gdd}</span>
+                            <span>WIND: {metrics.wind}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                        <button onClick={() => setView('shed')} className="card-luxe p-5 flex justify-between items-center hover:bg-slate-50">
+                            <span className="font-800 text-slate-700">The Shed</span>
+                            <span className="alert-ring">🚜</span>
+                        </button>
+                        <button onClick={() => setView('profile')} className="card-luxe p-5 flex justify-between items-center hover:bg-slate-50">
+                            <span className="font-800 text-slate-700">My Yard</span>
+                            <span>🌱</span>
                         </button>
                     </div>
                 </div>
             );
 
-            const ResearchView = () => (
+            const ShedView = () => (
                 <div className="px-6 max-w-md mx-auto pb-24 animate-in slide-in-from-right">
-                    <h2 className="text-3xl font-800 text-[#2D5A27] mb-8">Agronomy Library</h2>
-                    <div className="space-y-6">
-                        {SEED_RESEARCH.map((s, i) => (
-                            <div key={i} className="card-luxe p-6">
-                                <div className="flex justify-between items-start mb-4">
-                                    <h4 className="font-800 text-lg">{s.type}</h4>
-                                    <span className={`seed-badge ${s.type.includes('Blue') ? 'kbg' : 'tf'}`}>Elite Cultivar</span>
+                    <h2 className="text-3xl font-800 text-slate-900 mb-6">The Shed</h2>
+                    {shed.length > 0 ? shed.map(item => (
+                        <div key={item.id} className="card-luxe p-6 mb-4">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="text-[10px] font-bold text-blue-500 uppercase">{item.brand}</p>
+                                    <h4 className="text-lg font-800 text-slate-800">{item.name}</h4>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <div className="text-[10px]">
-                                        <p className="font-bold text-gray-400 uppercase">Germination</p>
-                                        <p className="font-800">{s.germ}</p>
-                                    </div>
-                                    <div className="text-[10px]">
-                                        <p className="font-bold text-gray-400 uppercase">Optimal Soil</p>
-                                        <p className="font-800">{s.optTemp}</p>
-                                    </div>
-                                </div>
-                                <p className="text-xs text-gray-500 font-medium leading-relaxed italic">"{s.use}"</p>
+                                <span className="text-xs bg-red-50 text-red-500 px-2 py-1 rounded font-bold uppercase">Dull</span>
                             </div>
-                        ))}
+                            <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">Last Sharpened</span>
+                                <span className="text-xs font-800">{item.lastSharp}</span>
+                            </div>
+                        </div>
+                    )) : (
+                        <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                            <p className="text-slate-400 font-800 uppercase text-xs">Shed is Empty</p>
+                        </div>
+                    )}
+                    <button className="w-full py-4 mt-4 bg-slate-900 text-white rounded-2xl font-800 uppercase text-[10px] tracking-widest">+ Register New Equipment</button>
+                </div>
+            );
+
+            const MyYardView = () => (
+                <div className="px-6 max-w-md mx-auto pb-24 animate-in slide-in-from-right">
+                    <h2 className="text-3xl font-800 text-slate-900 mb-6">My Yard</h2>
+                    <div className="space-y-4">
+                        <div className="card-luxe p-6">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-4">Core Info</p>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-800 text-slate-400 block mb-1">CULTIVAR</label>
+                                    <p className="font-700 text-slate-800 border-b pb-2">{profile.grassType}</p>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-800 text-slate-400 block mb-1">SOIL TEXTURE</label>
+                                    <p className="font-700 text-slate-800 border-b pb-2">{profile.soil}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="card-luxe p-6">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-4">Lab Results (pH)</p>
+                            <p className="text-4xl font-800 text-[#2D5A27]">{profile.ph}</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-2">OPTIMAL RANGE: 6.2 - 7.0</p>
+                        </div>
                     </div>
                 </div>
             );
 
             return (
                 <div className="min-h-screen">
-                    <nav className="fixed top-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-md px-6 flex justify-between items-center z-50 border-b border-gray-100">
+                    <nav className="fixed top-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-lg px-6 flex justify-between items-center z-50 border-b border-slate-100">
                         <div onClick={() => setView('dashboard')} className="flex items-center gap-1 cursor-pointer">
-                            <div className="w-6 h-6 bg-[#2D5A27] rounded-lg flex items-center justify-center">
+                            <div className="w-7 h-7 bg-[#2D5A27] rounded-xl flex items-center justify-center shadow-lg shadow-green-900/20">
                                 <div className="w-2 h-4 bg-[#A2D149] rounded-sm transform rotate-12"></div>
                             </div>
-                            <span className="font-800 text-2xl tracking-tighter text-[#2D5A27]">yardly</span>
+                            <span className="font-800 text-2xl tracking-tighter text-slate-900">yardly</span>
                         </div>
-                        <button onClick={() => setIsMenuOpen(true)} className="p-2"><div className="w-5 h-0.5 bg-[#2D5A27] mb-1"></div><div className="w-5 h-0.5 bg-[#2D5A27]"></div></button>
+                        <button onClick={() => setIsMenuOpen(true)} className="w-10 h-10 flex flex-col items-center justify-center gap-1.5">
+                            <div className="w-5 h-0.5 bg-slate-900"></div>
+                            <div className="w-5 h-0.5 bg-slate-900"></div>
+                        </button>
                     </nav>
 
                     {isMenuOpen && (
-                        <div className="fixed inset-0 z-[100] bg-white p-10 animate-in fade-in duration-300">
-                            <button onClick={() => setIsMenuOpen(false)} className="absolute top-8 right-8 text-2xl">✕</button>
-                            <div className="flex flex-col gap-6 mt-16">
-                                {['dashboard', 'research', 'shed', 'soil'].map(m => (
-                                    <button key={m} onClick={() => { setView(m); setIsMenuOpen(false); }} className="text-4xl font-800 text-left capitalize text-[#2D5A27] hover:text-[#A2D149]">{m}</button>
+                        <div className="fixed inset-0 z-[100] bg-white p-10 flex flex-col animate-in fade-in duration-300">
+                            <button onClick={() => setIsMenuOpen(false)} className="self-end text-3xl text-slate-300 font-light">✕</button>
+                            <div className="mt-12 space-y-8">
+                                {['dashboard', 'shed', 'profile', 'research'].map(m => (
+                                    <button key={m} onClick={() => { setView(m); setIsMenuOpen(false); }} className="block text-4xl font-800 text-slate-900 capitalize hover:text-[#2D5A27]">
+                                        {m === 'profile' ? 'My Yard' : m}
+                                    </button>
                                 ))}
                             </div>
                         </div>
                     )}
 
                     {view === 'dashboard' && <Dashboard />}
-                    {view === 'research' && <ResearchView />}
-                    {view === 'shed' && <div className="p-10 font-800 uppercase text-gray-300">Fleet Active</div>}
-                    {view === 'soil' && <div className="p-10 font-800 uppercase text-gray-300">Lab Online</div>}
+                    {view === 'shed' && <ShedView />}
+                    {view === 'profile' && <MyYardView />}
+                    {view === 'research' && <div className="p-10 font-800 uppercase text-slate-300">Library Online</div>}
                 </div>
             );
         };
