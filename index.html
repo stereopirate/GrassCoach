@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1B3022">
+    <title>Grass Coach - Strategy. Not Guesswork.</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="v4-new-components.js" type="text/babel"></script>
+
+    <style>
+        :root {
+            --forest-green: #1B3022;
+            --grass-gold: #D4AF37;
+            --athletic-white: #F5F5F5;
+        }
+        body { 
+            background-color: var(--athletic-white); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .coach-card { background: white; border-bottom: 4px solid var(--forest-green); border-radius: 1.25rem; }
+        .btn-coach { background: var(--forest-green); color: var(--grass-gold); font-weight: 800; text-transform: uppercase; }
+        .nav-active { color: var(--grass-gold); transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const LawnCareTracker = () => {
+            // --- STATE MANAGEMENT ---
+            const [activities, setActivities] = useState(() => JSON.parse(localStorage.getItem('gc_activities') || '[]'));
+            const [equipment, setEquipment] = useState(() => JSON.parse(localStorage.getItem('gc_shed') || '[]'));
+            const [soilData, setSoilData] = useState(() => JSON.parse(localStorage.getItem('gc_soil') || '{"n":"Optimal","p":"Optimal","k":"Optimal","ph":6.5}'));
+            const [view, setView] = useState('dashboard'); // dashboard, shed, soil, add, calendar
+            const [weather, setWeather] = useState({ rainfallLast24: 0.65, temp: 72 }); // Mocked for Stress Test
+
+            // Persistence
+            useEffect(() => localStorage.setItem('gc_activities', JSON.stringify(activities)), [activities]);
+            useEffect(() => localStorage.setItem('gc_shed', JSON.stringify(equipment)), [equipment]);
+            useEffect(() => localStorage.setItem('gc_soil', JSON.stringify(soilData)), [soilData]);
+
+            // --- COACH LOGIC ---
+            const healthScore = calculateHealthScore(activities);
+
+            // --- COMPONENTS ---
+
+            // 1. Soil Test Translator
+            const SoilTranslator = () => {
+                const getAdvice = () => {
+                    let advice = [];
+                    if (parseFloat(soilData.ph) < 6.0) advice.push("pH is acidic. Coach recommends applying Lime to raise pH.");
+                    if (parseFloat(soilData.ph) > 7.2) advice.push("pH is alkaline. Coach recommends Elemental Sulfur to lower pH.");
+                    if (soilData.n === 'Low') advice.push("Nitrogen is Low. Use a high-N fertilizer (e.g., 30-0-0) for your next feeding.");
+                    return advice.length > 0 ? advice : ["Soil looks game-ready! Maintain current schedule."];
+                };
+
+                return (
+                    <div className="p-4 pb-24 max-w-md mx-auto">
+                        <header className="mb-6">
+                            <h2 className="text-2xl font-black text-[#1B3022] italic uppercase">Soil Lab</h2>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Input your latest test results</p>
+                        </header>
+                        
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-gray-400">Soil pH</label>
+                                    <input 
+                                        type="number" step="0.1" value={soilData.ph} 
+                                        onChange={(e) => setSoilData({...soilData, ph: e.target.value})}
+                                        className="w-full text-2xl font-bold border-b-2 border-gray-100 focus:border-[#D4AF37] outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-gray-400">Nitrogen (N)</label>
+                                    <select 
+                                        value={soilData.n} 
+                                        onChange={(e) => setSoilData({...soilData, n: e.target.value})}
+                                        className="w-full text-lg font-bold bg-transparent outline-none"
+                                    >
+                                        <option>Low</option><option>Optimal</option><option>High</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="p-4 bg-[#1B3022] rounded-2xl">
+                                <p className="text-[10px] font-bold text-[#D4AF37] uppercase mb-2">Coach's Orders:</p>
+                                {getAdvice().map((line, i) => (
+                                    <p key={i} className="text-white text-sm font-medium mb-1">● {line}</p>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- MAIN RENDER LOGIC ---
+            const renderView = () => {
+                switch(view) {
+                    case 'shed': return <TheShed equipment={equipment} setEquipment={setEquipment} setView={setView} />;
+                    case 'soil': return <SoilTranslator />;
+                    case 'add': return (
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white w-full max-w-sm rounded-3xl p-6">
+                                <h2 className="text-xl font-black text-[#1B3022] uppercase mb-4 italic">Field Entry</h2>
+                                <p className="text-sm text-gray-500 mb-6 font-medium">Select gear from The Shed to calculate dial settings.</p>
+                                <button onClick={() => setView('dashboard')} className="w-full py-4 bg-gray-100 rounded-xl font-bold uppercase text-xs">Close</button>
+                            </div>
+                        </div>
+                    );
+                    default: return (
+                        <div className="p-4 pb-24 max-w-md mx-auto">
+                            <header className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h1 className="text-3xl font-black text-[#1B3022] tracking-tighter italic">GRASS COACH</h1>
+                                    <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">Strategy. Not Guesswork.</p>
+                                </div>
+                                <div className="h-12 w-12 bg-[#1B3022] rounded-full flex flex-col items-center justify-center border-2 border-[#D4AF37]">
+                                    <span className="text-[8px] font-black text-[#D4AF37] leading-none uppercase">Score</span>
+                                    <span className="text-lg font-black text-white leading-none">{healthScore}</span>
+                                </div>
+                            </header>
+
+                            <RainDefense weather={weather} />
+
+                            <div className="grid grid-cols-2 gap-3 mb-8">
+                                <div onClick={() => setView('soil')} className="coach-card p-4 cursor-pointer active:scale-95 transition-all">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Soil pH</p>
+                                    <p className="font-black text-[#1B3022] text-xl">{soilData.ph} <span className="text-xs">🧪</span></p>
+                                </div>
+                                <div onClick={() => setView('shed')} className="coach-card p-4 border-[#D4AF37] cursor-pointer active:scale-95 transition-all">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">The Shed</p>
+                                    <p className="font-black text-[#1B3022] text-xl">{equipment.length} <span className="text-xs text-gray-400">Tools</span></p>
+                                </div>
+                            </div>
+
+                            <button onClick={() => setView('add')} className="w-full py-5 btn-coach rounded-2xl shadow-xl shadow-[#1B3022]/20 active:scale-95 transition-all mb-8 text-lg">
+                                Add Field Entry +
+                            </button>
+
+                            <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest mb-4">Season Tape</h3>
+                            <div className="space-y-3">
+                                {activities.slice(0,3).map(a => (
+                                    <div key={a.id} className="bg-white p-4 rounded-2xl flex justify-between items-center border border-gray-100">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xl">🚜</span>
+                                            <div>
+                                                <p className="font-bold text-gray-800 capitalize">{a.type}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase">{a.date}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+            };
+
+            return (
+                <div className="min-h-screen">
+                    {renderView()}
+                    
+                    {/* NAV BAR */}
+                    <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-gray-100 px-6 py-4 flex justify-between items-center z-40">
+                        <button onClick={() => setView('dashboard')} className={`text-xl ${view === 'dashboard' ? 'nav-active' : 'text-gray-300'}`}>🏠</button>
+                        <button onClick={() => setView('soil')} className={`text-xl ${view === 'soil' ? 'nav-active' : 'text-gray-300'}`}>🧪</button>
+                        <button onClick={() => setView('shed')} className={`text-xl ${view === 'shed' ? 'nav-active' : 'text-gray-300'}`}>🚜</button>
+                        <button onClick={() => setView('calendar')} className={`text-xl ${view === 'calendar' ? 'nav-active' : 'text-gray-300'}`}>📅</button>
+                    </nav>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<LawnCareTracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
